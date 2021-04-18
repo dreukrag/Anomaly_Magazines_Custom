@@ -10,6 +10,17 @@ local iWEP_MSEC = 2
 local iWEP_COUNT = 3
 local iWEP_FILL = 4
 
+function split (inputstr, sep)
+	if sep == nil then
+			sep = "%s"
+	end
+	local t={}
+	for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
+			table.insert(t, str)
+	end
+	return t
+end
+
 function print_f( text )
 
 	printf( text )
@@ -1289,6 +1300,16 @@ function MagazineCalculateWeight(magazine)
 	local magSlot = magData[iMAG_SLOT]
 	local currentAmmoCount = tonumber(magData[iMAG_COUNT])
 	local ammoFill = magData[iMAG_FILL]
+	local mag_type = system_ini():r_string_ex(magazine:section(),"mag_capacity")
+	local mag_multiplier = 1
+
+	if (mag_type == "low") then
+		mag_multiplier = 0.25
+	elseif (mag_type == "low") then
+		mag_multiplier = 1
+	elseif (mag_type == "low") then
+		mag_multiplier = 1.5
+	end			
 
 	for i = 1, #ammoFill do
 		local index = ammoFill:sub(i,i)
@@ -1298,7 +1319,7 @@ function MagazineCalculateWeight(magazine)
 		local box_weight = system_ini():r_float_ex(ammoType, "inv_weight")
 		local cartridge_weight = box_weight / box_size
 		
-		mag_weight_empty = mag_weight_empty + cartridge_weight
+		mag_weight_empty = (mag_weight_empty + cartridge_weight) * mag_multiplier
 		
 	end
 	
@@ -1529,12 +1550,10 @@ function IsMagazineForWeapon(weapon, magazine)
 	--local wep_ammos = txr_utils.get_weapon_ammo_list(weapon) --alun_utils.parse_list(system_ini(),weapon:section(),"mag_ammo_class")
 	
 	local wep_ammos = utils_item.get_ammo(weapon:section(), weapon:id())
-	
 	--print_f("mag_ammos")
 	--DEBUG_PrintAmmoClass(mag_ammos)
 	--print_f("wep_ammos")
 	--DEBUG_PrintAmmoClass(wep_ammos)
-	
 	
 	local magazine_group = parse_list(system_ini(),magazine:section(),"magazine_group",true)
 	if (magazine_group[weaponBase] and mag_ammos[1] == wep_ammos[1]) then 
@@ -1768,15 +1787,11 @@ function WeaponGetDefaulMagSection(weapon)
 	local ammo = utils_item.get_ammo(weapon:section(), weapon:id())
 	
 	-- Check for corrupted weapons
-	
 	if(ammo[1] ~= nil) then
-	
-		local ammoName = string.gsub(ammo[1], "%ammo_", "") --alun_utils.str_explode(ammo[1],"ammo_")
+
+		local name = split(ammo[1], "_")
 		
-		--ammoName = 
-		
-		
-		local defaultMagSection = "mag_" .. weaponBase .. "_" .. ammoName
+		local defaultMagSection = "mag_" .. name[2] .. "_medium"
 
 		return defaultMagSection
 		
@@ -1895,9 +1910,6 @@ function on_item_focus(item)
 	local defaultMagSectionExists = system_ini():section_exist(defaultMagSection)
 	
 	if (item and IsWeapon(item) and (not IsMelee(item)) and validMagIsInWeapon == false ) then
-	
-
-		
 		
 		if(defaultMagSectionExists and magData[iWEP_MSEC] ~= "no_mag") then
 			
@@ -1929,113 +1941,12 @@ function on_item_focus(item)
 			--weapon:set_ammo_type(ammo_type)
 			--item:set_ammo_elapsed(tonumber(maxAmmo))
 		
-		
-
-		
-			
-		
 		else
 		
 			print_f("ERROR: mag section invalid: " .. defaultMagSection)
 			
 		end
 
-		
-		
-		
-		
-		
-		
-		--[[
-		local weaponBase = item:section()
-	
-		--local weaponBaseParts = alun_utils.str_explode(item:section(),"_")
-	
-		--local scopeClass = weaponBaseParts[table.getn(weaponBaseParts)]
-	
-		local weapon_ammo = item:get_ammo_in_magazine()
-	
-		if(weapon_ammo == 0) then return end
-	
-		local lastPart = GetLastSectionPart(weaponBase)
-	
-		--print_f("on_item_focus")
-	
-		local tempData = WeaponGetMagData(item)
-		
-		--print_f("on_item_focus2")
-	
-		
-		local tempMagClass = tempData[1]
-		
-		-- get old mag data if available
-		if(IsMagInPlace(item) and system_ini():section_exist(tempMagClass)) then
-		
-		
-			local currentMagClass = tempData[1]
-			
-			local currentAmmoName = tempData[2]
-			
-			local currentMagAmmo = weapon_ammo
-			
-			WeaponSetMagData(item, currentMagClass .. ":" .. currentAmmoName .. ":" .. currentMagAmmo)
-		
-		else
-		
-			-- remove the scope part
-			if((WeaponRemovableScopeAttached(item) or lastPart == "short" or lastPart == "nimble") and not system_ini():section_exist("mag_" .. weaponBase)) then
-			
-				-- lets strip the scope postfix
-				--local nameparts = 
-				
-				
-				
-				--print_f("WeaponRemovableScopeAttached: %s", nameparts[table.getn(nameparts)])
-				
-				local basetemp = alun_utils.str_explode(weaponBase,"_" .. lastPart)
-				
-				weaponBase = basetemp[1]
-				
-				--print_f("WeaponRemovableScopeAttached: base class : " .. weaponBase)
-				
-			
-			end
-			
-			
-			lastPart = GetLastSectionPart(weaponBase)
-			-- remove nimble part if exists (those can occur like weapon_nimble_scope)
-			if(lastPart == "nimble" and not system_ini():section_exist("mag_" .. weaponBase)) then
-			
-				local basetemp = alun_utils.str_explode(weaponBase,"_" .. lastPart)
-				
-				weaponBase = basetemp[1]
-				
-
-			
-			end
-			
-			local currentMagClass = "mag_" .. weaponBase
-			
-			local currentAmmoName = item:get_ammo_name()
-			
-			local currentMagAmmo = weapon_ammo
-			
-			WeaponSetMagData(item, currentMagClass .. ":" .. currentAmmoName .. ":" .. currentMagAmmo)
-			
-		end
-		
-		]]
-		
-		--local mag_ammo_count = GetMagAmmo(item) --item:get_ammo_in_magazine()
-		--local mag_class_name = "mag_" .. weaponBase --item:section() -- store this in custom_data of the weapon
-		--local mag_current_ammo_type = item:get_ammo_name()
-		
-		-- check if there is a magazine already
-		
-		-- local currentMag = WeaponGetMagData(weapon)
-		
-
-		
 	end
 	
 	printf("D1")
@@ -2054,31 +1965,7 @@ function on_item_focus(item)
 	printf("D2")
 	UpdateMagazineUI(item)
 	printf("D3")
-	--[[
-	if (RepairTools[section]) then 
-		local ini = system_ini()
-		local repair_type = ini:r_string_ex(section,"repair_type")
-		if not (repair_type) then 
-			return
-		end
-		
-		local function itr(obj)
-			if (repair_type == "weapon" and IsWeapon(obj)) then 
-				return true 
-			elseif (repair_type == "outfit") and (IsOutfit(obj) or IsHeadgear(obj)) then 
-				return true
-			elseif (repair_type == "all") then 
-				local cls = obj:clsid()
-				if (IsWeapon(nil,cls) or IsOutfit(nil,cls) or IsHeadgear(nil,cls)) then 
-					return true 
-				end
-			end
-			return false
-		end 
-		
-		ActorMenu.get_actor_menu():highlight_for_each_in_slot(itr)
-	end 
-	--]]
+	
 end 
 
 function AmmoWheel_GetMagazineListAndLoad(weapon, loadAndReturn)
